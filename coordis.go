@@ -36,7 +36,7 @@ type Coordis interface {
 	// Gets all task ids currently assigned to the given entity.
 	GetAssignedTasks(who string) ([]string, error)
 
-	// Shuts down everyone who is waiting for tasks to complete.
-	// Blocks until all waiters have exited
+	// Releases everyone who is blocked by a call to WaitForNext.
+	// Returns once everyone has been unblocked.
 	Shutdown()
 }
