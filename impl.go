@@ -28,7 +28,9 @@ type impl struct {
 	waitCom        chan int
 }
 
-// Instantiate a new Coordis
+// Instantiate a new Coordis, prefix is prepended to
+// each key that Coordis stores in Redis to avoid
+// collisions with other data.
 func NewCoordis(client redis.Conn, prefix string) Coordis {
 	ret := &impl{client, prefix, 0, false, make(chan int)}
 	go func() {
