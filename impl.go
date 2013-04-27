@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/garyburd/redigo/redis"
-	"github.com/serverhorror/uuid"
+	"github.com/nu7hatch/gouuid"
 	"time"
 )
 
@@ -42,11 +42,18 @@ func NewCoordis(client redis.Conn, prefix string) Coordis {
 }
 
 // Left is the front of the queue
-func (tm *impl) scheduleInner(t *Task) string {
-	id := uuid.UUID4()
+func (tm *impl) scheduleInner(t *Task) (string, error) {
+	uid, err := uuid.NewV4()
+	if err != nil {
+		return "", err
+	}
+	id := uid.String()
 	if t.Prereqs != nil && len(t.Prereqs) > 0 {
 		for _, p := range t.Prereqs {
-			pId := tm.scheduleInner(p)
+			pId, err := tm.scheduleInner(p)
+			if err != nil {
+				return "", err
+			}
 			tm.client.Send("SADD", tm.buildKey(ktPrereq, id), pId)
 			tm.client.Send("SET", tm.buildKey(ktWaitingOn, pId), id)
 		}
@@ -56,13 +63,17 @@ func (tm *impl) scheduleInner(t *Task) string {
 	}
 	tm.client.Send("SET", tm.buildKey(ktTypeOf, id), t.Type)
 	tm.client.Send("SET", tm.buildKey(ktData, id), t.Data)
-	return id
+	return id, nil
 }
 
 func (tm *impl) Schedule(task *Task) error {
 	tm.client.Send("MULTI")
-	tm.scheduleInner(task)
-	_, err := tm.client.Do("EXEC")
+	_, err := tm.scheduleInner(task)
+	if err != nil {
+		tm.client.Do("DISCARD")
+		return err
+	}
+	_, err = tm.client.Do("EXEC")
 	return err
 }
 
